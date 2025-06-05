@@ -39,6 +39,7 @@ if not st.session_state.authenticated:
 
 # Cargar inventario
 @st.cache_data
+
 def load_data():
     return pd.read_csv("reactivos.csv")
 
@@ -132,9 +133,9 @@ if st.session_state.pantalla in ["buscar_reactivo", "detalle_reactivo"]:
                     st.error("Error al subir la foto")
 
         st.markdown(f"**Ubicación:** {info.get('Ubicación', 'No disponible')}")
-        etiquetas = ', '.join(seleccionados['Numero'].dropna().astype(str).unique())
-        empresas = ', '.join(seleccionados['Empresa'].dropna().astype(str).unique())
-        catalogos = ', '.join(seleccionados['Catalogo'].dropna().astype(str).unique())
+        etiquetas = ', '.join(seleccionados.get('Numero', pd.Series(dtype=str)).dropna().astype(str).unique())
+        empresas = ', '.join(seleccionados.get('Empresa', pd.Series(dtype=str)).dropna().astype(str).unique())
+        catalogos = ', '.join(seleccionados.get('Catalogo', pd.Series(dtype=str)).dropna().astype(str).unique())
         st.markdown(f"**Número de etiqueta:** {etiquetas}")
         st.markdown(f"**Empresa:** {empresas}")
         st.markdown(f"**Catálogo:** {catalogos}")
