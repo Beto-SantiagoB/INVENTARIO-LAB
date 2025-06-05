@@ -14,7 +14,7 @@ import json
 if not firebase_admin._apps:
     cred = credentials.Certificate(json.loads(st.secrets["firebase"]))
     firebase_admin.initialize_app(cred, {
-        'storageBucket': 'inventario-lab-c0974.appspot.com'
+        'storageBucket': 'inventario-lab-c0974.firebasestorage.app'
     })
 
 db = firestore.client()
