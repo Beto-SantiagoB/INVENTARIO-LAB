@@ -6,9 +6,19 @@ from PIL import Image
 import io
 import os
 from difflib import get_close_matches
+import openai
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
 
-# Configuración de Firebase (sustituir con tu propia configuración)
-FIREBASE_STORAGE_BUCKET = "https://firebasestorage.googleapis.com/v0/b/TU_BUCKET.appspot.com/o"
+# Configuración de Firebase
+if not firebase_admin._apps:
+    cred = credentials.Certificate("firebase_key.json")
+    firebase_admin.initialize_app(cred, {
+        'storageBucket': 'inventario-lab-c0974.appspot.com'  # Reemplaza con tu bucket real
+    })
+
+db = firestore.client()
+bucket = storage.bucket()
 
 # Usuarios simulados
 users = {
@@ -39,7 +49,6 @@ if not st.session_state.authenticated:
 
 # Cargar inventario
 @st.cache_data
-
 def load_data():
     return pd.read_csv("reactivos.csv")
 
@@ -95,7 +104,7 @@ if st.session_state.pantalla in ["buscar_reactivo", "detalle_reactivo"]:
 
             if not matches.empty:
                 opciones = sorted(matches['Nombre'].unique())
-                selected = st.selectbox("Resultados:", opciones)
+                selected = st.selectbox("Resultados:", opciones, index=0, key="select_result", label_visibility="visible")
                 st.session_state.reactivo_seleccionado = selected
 
     if st.session_state.reactivo_seleccionado:
@@ -103,8 +112,12 @@ if st.session_state.pantalla in ["buscar_reactivo", "detalle_reactivo"]:
         info = seleccionados.iloc[0]
         st.header(st.session_state.reactivo_seleccionado)
 
-        if info.get('Foto') and isinstance(info['Foto'], str) and info['Foto'].startswith("http"):
-            st.image(info['Foto'], use_column_width=True)
+        filename = st.session_state.reactivo_seleccionado.replace(" ", "_") + ".jpg"
+        blob = bucket.blob(filename)
+
+        if blob.exists():
+            photo_url = blob.generate_signed_url(version="v4", expiration=3600)
+            st.image(photo_url, use_column_width=True)
         else:
             st.info("Sin foto disponible")
             uploaded = st.file_uploader("📸 Tomar/Subir foto", type=["jpg", "jpeg", "png"], accept_multiple_files=False, label_visibility="visible")
@@ -119,27 +132,46 @@ if st.session_state.pantalla in ["buscar_reactivo", "detalle_reactivo"]:
                         break
                     quality -= 5
                 buffer.seek(0)
-                filename = st.session_state.reactivo_seleccionado.replace(" ", "_") + ".jpg"
-                response = requests.post(
-                    f"{FIREBASE_STORAGE_BUCKET}?name={filename}",
-                    headers={"Content-Type": "image/jpeg"},
-                    data=buffer.getvalue()
-                )
-                if response.status_code in [200, 201]:
-                    photo_url = f"{FIREBASE_STORAGE_BUCKET.replace('/o', '')}/o/{filename}?alt=media"
-                    st.success("Foto subida exitosamente")
-                    st.image(photo_url, use_column_width=True)
-                else:
-                    st.error("Error al subir la foto")
+                blob.upload_from_file(buffer, content_type='image/jpeg')
+                blob.make_public()
+                st.success("Foto subida exitosamente")
+                st.image(blob.public_url, use_column_width=True)
 
         st.markdown(f"**Ubicación:** {info.get('Ubicación', 'No disponible')}")
-        etiquetas = ', '.join(seleccionados.get('Numero', pd.Series(dtype=str)).dropna().astype(str).unique())
+        etiquetas = ', '.join(seleccionados.get('Número', pd.Series(dtype=str)).dropna().astype(str).unique())
         empresas = ', '.join(seleccionados.get('Empresa', pd.Series(dtype=str)).dropna().astype(str).unique())
-        catalogos = ', '.join(seleccionados.get('Catalogo', pd.Series(dtype=str)).dropna().astype(str).unique())
-        st.markdown(f"**Número de etiqueta:** {etiquetas}")
-        st.markdown(f"**Empresa:** {empresas}")
-        st.markdown(f"**Catálogo:** {catalogos}")
-        st.markdown(f"**Observaciones:** {info.get('Observaciones', 'No disponible')}")
+        catalogos = ', '.join(seleccionados.get('Catálogo', pd.Series(dtype=str)).dropna().astype(str).unique())
+
+        st.markdown(f"**Número de etiqueta:** {etiquetas if etiquetas else 'No disponible'}")
+        st.markdown(f"**Empresa:** {empresas if empresas else 'No disponible'}")
+        st.markdown(f"**Catálogo:** {catalogos if catalogos else 'No disponible'}")
+
+        # Observaciones generadas y guardadas en Firestore
+        observacion = info.get('Observaciones')
+        reactivo_id = st.session_state.reactivo_seleccionado.replace(" ", "_").lower()
+        doc_ref = db.collection("observaciones").document(reactivo_id)
+        doc = doc_ref.get()
+
+        if doc.exists:
+            texto_obs = doc.to_dict().get("texto")
+        elif pd.notna(observacion):
+            texto_obs = observacion
+        else:
+            descripcion = info['Nombre'] + ' ' + empresas + ' ' + catalogos
+            try:
+                respuesta = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "Eres un asistente experto en seguridad química de laboratorio. Tu tarea es indicar si un reactivo requiere manejo especial, puede desecharse en el drenaje, o en la basura general, y mencionar cualquier precaución de seguridad importante."},
+                        {"role": "user", "content": f"Reactivo: {descripcion}"}
+                    ]
+                )
+                texto_obs = respuesta.choices[0].message.content
+                doc_ref.set({"texto": texto_obs})
+            except Exception as e:
+                texto_obs = "No disponible (error de IA)"
+
+        st.markdown(f"**Observaciones:** {texto_obs}")
 
         if st.button("🔴 Reportar como en riesgo de agotarse"):
             st.warning("Se ha reportado este reactivo como bajo (simulado)")
