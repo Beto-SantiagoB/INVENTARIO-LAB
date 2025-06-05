@@ -127,8 +127,8 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.title(reactivo)
     detalles = data[data["Nombre"] == reactivo]
 
-    doc_ref = db.collection("imagenes").document(reactivo)
     try:
+        doc_ref = db.collection("imagenes").document(reactivo)
         doc = doc_ref.get()
         if doc.exists:
             token = doc.to_dict().get("token")
