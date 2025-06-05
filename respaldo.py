@@ -1,3 +1,18 @@
+import streamlit as st
+import pandas as pd
+import base64
+import requests
+from PIL import Image
+import io
+import os
+from difflib import get_close_matches
+import firebase_admin
+from firebase_admin import credentials, firestore, storage
+import json
+from urllib.parse import quote
+from uuid import uuid4
+import datetime
+
 # Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
     cred = credentials.Certificate(json.loads(st.secrets["firebase"]))
@@ -18,6 +33,9 @@ users = {
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.user = None
+
+if "mostrar_uploader" not in st.session_state:
+    st.session_state.mostrar_uploader = False
 
 def login():
     st.title("Inicio de sesión")
@@ -120,16 +138,43 @@ elif st.session_state.pantalla == "detalle_reactivo":
                 url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{quote(reactivo)}.jpg?alt=media&token={token}"
                 st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
             else:
-                st.info("No hay imagen disponible.")
+                if st.button("No hay imagen disponible (Agregar)"):
+                    st.session_state.mostrar_uploader = True
         else:
-            st.info("No hay imagen disponible.")
+            if st.button("No hay imagen disponible (Agregar)"):
+                st.session_state.mostrar_uploader = True
     except Exception as e:
         st.warning(f"Error al consultar Firestore: {e}")
 
+    if st.session_state.mostrar_uploader:
+        imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key=reactivo)
+        if imagen_subida and st.button("Subir imagen"):
+            imagen = Image.open(imagen_subida).convert("RGB")
+            buffer = io.BytesIO()
+            imagen.save(buffer, format="JPEG", quality=50)
+            buffer.seek(0)
+
+            token = str(uuid4())
+            blob = bucket.blob(f"reactivos/{reactivo}.jpg")
+            blob.metadata = {"firebaseStorageDownloadTokens": token}
+            blob.upload_from_file(buffer, content_type='image/jpeg')
+
+            try:
+                db.collection("imagenes").document(reactivo).set({
+                    "token": token,
+                    "usuario": st.session_state.user,
+                    "timestamp": datetime.datetime.now()
+                })
+                st.success("Imagen subida y token guardado correctamente")
+                st.session_state.mostrar_uploader = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar token en Firestore: {e}")
+
     def extraer_valores(columna):
         if columna in detalles.columns:
-            valores = detalles[columna].fillna("NA").tolist()
-            return valores
+            valores = detalles[columna].dropna().unique().tolist()
+            return valores if valores else ["NA"]
         return ["NA"]
 
     etiquetas = extraer_valores("Número")
@@ -143,32 +188,6 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.write("**Empresa:**", ", ".join(empresas))
     st.write("**Catálogo:**", ", ".join(catalogos))
     st.write("**Observaciones:**", ", ".join(observaciones))
-
-    st.markdown("---")
-    st.subheader("Actualizar o añadir fotografía")
-    imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key=reactivo)
-    if imagen_subida and st.button("Subir imagen"):
-        imagen = Image.open(imagen_subida).convert("RGB")
-        buffer = io.BytesIO()
-        imagen.save(buffer, format="JPEG", quality=50)
-        buffer.seek(0)
-    
-        token = str(uuid4())
-        blob = bucket.blob(f"reactivos/{reactivo}.jpg")
-        blob.metadata = {"firebaseStorageDownloadTokens": token}
-        blob.upload_from_file(buffer, content_type='image/jpeg')
-        
-        # Guardar token en Firestore
-        try:
-            db.collection("imagenes").document(reactivo).set({
-                "token": token,
-                "usuario": st.session_state.user,
-                "timestamp": datetime.datetime.now()
-            })
-            st.success("Imagen subida y token guardado correctamente")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al guardar token en Firestore: {e}")
 
     if st.button("⚠️ Reportar que se está agotando"):
         st.warning("¡Este reactivo ha sido marcado como en riesgo de agotarse!")
