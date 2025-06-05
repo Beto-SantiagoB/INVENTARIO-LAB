@@ -10,7 +10,9 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
 from urllib.parse import quote
-
+from uuid import uuid4
+import datetime
+from urllib.parse import quote
 
 # Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
@@ -125,10 +127,17 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.title(reactivo)
     detalles = data[data["Nombre"] == reactivo]
 
-    # Intentar mostrar la imagen desde Firebase directamente
-    reactivo_encoded = quote(reactivo)
-    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/inventario-lab-c0974.firebasestorage.app/o/reactivos%2F{reactivo_encoded}.jpg?alt=media&token=f7829159-4d2b-4686-abff-964198b83256"
-    st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
+    doc_ref = db.collection("imagenes").document(reactivo)
+    doc = doc_ref.get()
+    if doc.exists:
+        token = doc.to_dict().get("token")
+        if token:
+            url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{quote(reactivo)}.jpg?alt=media&token={token}"
+            st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
+        else:
+            st.info("No hay imagen disponible.")
+    else:
+        st.info("No hay imagen disponible.")
 
 
     def extraer_valores(columna):
@@ -157,11 +166,20 @@ elif st.session_state.pantalla == "detalle_reactivo":
         buffer = io.BytesIO()
         imagen.save(buffer, format="JPEG", quality=50)  # fuerza a JPEG para todos, corrigiendo errores de PNG con transparencia
         buffer.seek(0)
+        token = str(uuid4())
         blob = bucket.blob(f"reactivos/{reactivo}.jpg")
+        blob.metadata = {"firebaseStorageDownloadTokens": token}
         blob.upload_from_file(buffer, content_type='image/jpeg')
-        url_imagen = blob.public_url
+        
+        # Guardar el token en Firestore
+        db.collection("imagenes").document(reactivo).set({
+            "token": token,
+            "usuario": st.session_state.user,
+            "timestamp": datetime.datetime.now()
+        })
+        
         st.success("Imagen subida correctamente")
-        st.image(url_imagen)
+        st.rerun()
 
     if st.button("⚠️ Reportar que se está agotando"):
         st.warning("¡Este reactivo ha sido marcado como en riesgo de agotarse!")
