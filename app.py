@@ -39,7 +39,6 @@ if not st.session_state.authenticated:
 
 # Cargar inventario
 @st.cache_data
-
 def load_data():
     return pd.read_csv("reactivos.csv")
 
@@ -48,19 +47,29 @@ data = load_data()
 st.title("Panel Principal")
 st.subheader(f"Bienvenido, {st.session_state.user}")
 
-opcion = st.selectbox("Selecciona una opción:", [
-    "Ver inventario de reactivos",
-    "Buscar reactivo",
-    "Ver inventario de anticuerpos",
-    "Buscar anticuerpo"
-])
+if "pantalla" not in st.session_state:
+    st.session_state.pantalla = None
 
-if opcion == "Ver inventario de reactivos":
+col1, col2 = st.columns(2)
+
+with col1:
+    if st.button("🔍 Buscar reactivo"):
+        st.session_state.pantalla = "buscar_reactivo"
+    if st.button("📋 Ver inventario de reactivos"):
+        st.session_state.pantalla = "ver_reactivos"
+
+with col2:
+    if st.button("🔬 Buscar anticuerpo"):
+        st.session_state.pantalla = "buscar_anticuerpo"
+    if st.button("📄 Ver inventario de anticuerpos"):
+        st.session_state.pantalla = "ver_anticuerpos"
+
+if st.session_state.pantalla == "ver_reactivos":
     st.subheader("Inventario de Reactivos (orden alfabético)")
     for nombre in sorted(data['Nombre'].unique()):
         st.markdown(f"- {nombre}")
 
-elif opcion == "Buscar reactivo":
+elif st.session_state.pantalla == "buscar_reactivo":
     search = st.text_input("Buscar reactivo por nombre")
 
     if search:
@@ -129,5 +138,5 @@ elif opcion == "Buscar reactivo":
                     if submitted:
                         st.success("Sugerencia enviada para revisión (simulado)")
 
-elif opcion.startswith("Inventario de anticuerpos"):
+elif st.session_state.pantalla and "anticuerpo" in st.session_state.pantalla:
     st.warning("Esta sección estará disponible pronto. Puedes proporcionarme el inventario cuando quieras.")
