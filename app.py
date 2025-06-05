@@ -9,10 +9,11 @@ from difflib import get_close_matches
 # import openai  # Comentado temporalmente por falta de crédito
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
+import json
 
 # Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
-    cred = credentials.Certificate(st.secrets["firebase"])
+    cred = credentials.Certificate(json.loads(st.secrets["firebase"]))
     firebase_admin.initialize_app(cred, {
         'storageBucket': 'inventario-lab-c0974.appspot.com'
     })
