@@ -162,13 +162,13 @@ elif st.session_state.pantalla == "detalle_reactivo":
 
     st.markdown("---")
     st.subheader("Actualizar o añadir fotografía")
-    imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"])
-    if imagen_subida:
+    imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key=reactivo)
+    if imagen_subida and st.button("Subir imagen"):
         imagen = Image.open(imagen_subida).convert("RGB")
         buffer = io.BytesIO()
         imagen.save(buffer, format="JPEG", quality=50)
         buffer.seek(0)
-        
+    
         token = str(uuid4())
         blob = bucket.blob(f"reactivos/{reactivo}.jpg")
         blob.metadata = {"firebaseStorageDownloadTokens": token}
