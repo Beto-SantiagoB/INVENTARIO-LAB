@@ -124,11 +124,10 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.title(reactivo)
     detalles = data[data["Nombre"] == reactivo]
 
-    imagen_path = detalles["Imagen"].dropna().values[0] if "Imagen" in detalles.columns and not detalles["Imagen"].isna().all() else None
-    if imagen_path:
-        st.image(imagen_path)
-    else:
-        st.info("No hay imagen disponible.")
+    # Intentar mostrar la imagen desde Firebase directamente
+    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{reactivo}.jpg?alt=media"
+    st.image(url_imagen, caption="Imagen del reactivo (desde Firebase)", use_column_width=True)
+
 
     def extraer_valores(columna):
         if columna in detalles.columns:
