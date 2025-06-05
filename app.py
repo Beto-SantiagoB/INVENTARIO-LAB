@@ -166,22 +166,25 @@ elif st.session_state.pantalla == "detalle_reactivo":
     if imagen_subida:
         imagen = Image.open(imagen_subida).convert("RGB")
         buffer = io.BytesIO()
-        imagen.save(buffer, format="JPEG", quality=50)  # fuerza a JPEG para todos, corrigiendo errores de PNG con transparencia
+        imagen.save(buffer, format="JPEG", quality=50)
         buffer.seek(0)
+        
         token = str(uuid4())
         blob = bucket.blob(f"reactivos/{reactivo}.jpg")
         blob.metadata = {"firebaseStorageDownloadTokens": token}
         blob.upload_from_file(buffer, content_type='image/jpeg')
         
-        # Guardar el token en Firestore
-        db.collection("imagenes").document(reactivo).set({
-            "token": token,
-            "usuario": st.session_state.user,
-            "timestamp": datetime.datetime.now()
-        })
-        
-        st.success("Imagen subida correctamente")
-        st.rerun()
+        # Guardar token en Firestore
+        try:
+            db.collection("imagenes").document(reactivo).set({
+                "token": token,
+                "usuario": st.session_state.user,
+                "timestamp": datetime.datetime.now()
+            })
+            st.success("Imagen subida y token guardado correctamente")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error al guardar token en Firestore: {e}")
 
     if st.button("⚠️ Reportar que se está agotando"):
         st.warning("¡Este reactivo ha sido marcado como en riesgo de agotarse!")
