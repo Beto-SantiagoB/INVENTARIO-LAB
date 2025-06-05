@@ -90,7 +90,7 @@ if st.session_state.pantalla is None:
             st.session_state.pantalla = "añadir_anticuerpo"
             st.rerun()
         if st.session_state.user == "admin":
-            if st.button(⚠️ Reactivos por agotarse"):
+            if st.button("⚠️ Reactivos por agotarse"):
                 st.session_state.pantalla = "ver_alertas"
                 st.rerun()
 
