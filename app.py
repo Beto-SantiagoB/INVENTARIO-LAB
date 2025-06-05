@@ -9,7 +9,7 @@ from difflib import get_close_matches
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
-import pyrebase
+
 
 # Configurar Firebase con pyrebase (solo para autenticación)
 firebase_config = {
