@@ -173,8 +173,8 @@ elif st.session_state.pantalla == "detalle_reactivo":
 
     def extraer_valores(columna):
         if columna in detalles.columns:
-            valores = detalles[columna].fillna("NA").tolist()
-            return valores
+            valores = detalles[columna].dropna().unique().tolist()
+            return valores if valores else ["NA"]
         return ["NA"]
 
     etiquetas = extraer_valores("Número")
