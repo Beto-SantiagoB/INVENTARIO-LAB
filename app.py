@@ -126,7 +126,7 @@ elif st.session_state.pantalla == "detalle_reactivo":
 
     # Intentar mostrar la imagen desde Firebase directamente
     url_imagen = f"https://firebasestorage.googleapis.com/v0/b/inventario-lab-c0974/o/reactivos%2F{reactivo}.jpg?alt=media"
-    st.image(url_imagen, caption="Imagen del reactivo", use_column_width=True)
+    st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
 
 
     def extraer_valores(columna):
