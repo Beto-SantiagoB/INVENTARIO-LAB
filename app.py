@@ -12,7 +12,6 @@ import json
 from urllib.parse import quote
 from uuid import uuid4
 import datetime
-from urllib.parse import quote
 
 # Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
@@ -34,6 +33,9 @@ users = {
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.user = None
+
+if "mostrar_uploader" not in st.session_state:
+    st.session_state.mostrar_uploader = False
 
 def login():
     st.title("Inicio de sesión")
@@ -136,11 +138,38 @@ elif st.session_state.pantalla == "detalle_reactivo":
                 url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{quote(reactivo)}.jpg?alt=media&token={token}"
                 st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
             else:
-                st.info("No hay imagen disponible.")
+                if st.button("No hay imagen disponible (Agregar)"):
+                    st.session_state.mostrar_uploader = True
         else:
-            st.info("No hay imagen disponible.")
+            if st.button("No hay imagen disponible (Agregar)"):
+                st.session_state.mostrar_uploader = True
     except Exception as e:
         st.warning(f"Error al consultar Firestore: {e}")
+
+    if st.session_state.mostrar_uploader:
+        imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key=reactivo)
+        if imagen_subida and st.button("Subir imagen"):
+            imagen = Image.open(imagen_subida).convert("RGB")
+            buffer = io.BytesIO()
+            imagen.save(buffer, format="JPEG", quality=50)
+            buffer.seek(0)
+
+            token = str(uuid4())
+            blob = bucket.blob(f"reactivos/{reactivo}.jpg")
+            blob.metadata = {"firebaseStorageDownloadTokens": token}
+            blob.upload_from_file(buffer, content_type='image/jpeg')
+
+            try:
+                db.collection("imagenes").document(reactivo).set({
+                    "token": token,
+                    "usuario": st.session_state.user,
+                    "timestamp": datetime.datetime.now()
+                })
+                st.success("Imagen subida y token guardado correctamente")
+                st.session_state.mostrar_uploader = False
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al guardar token en Firestore: {e}")
 
     def extraer_valores(columna):
         if columna in detalles.columns:
@@ -160,82 +189,6 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.write("**Catálogo:**", ", ".join(catalogos))
     st.write("**Observaciones:**", ", ".join(observaciones))
 
-    st.markdown("---")
-    st.subheader("Actualizar o añadir fotografía")
-    imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"], key=reactivo)
-    if imagen_subida and st.button("Subir imagen"):
-        imagen = Image.open(imagen_subida).convert("RGB")
-        buffer = io.BytesIO()
-        imagen.save(buffer, format="JPEG", quality=50)
-        buffer.seek(0)
-    
-        token = str(uuid4())
-        blob = bucket.blob(f"reactivos/{reactivo}.jpg")
-        blob.metadata = {"firebaseStorageDownloadTokens": token}
-        blob.upload_from_file(buffer, content_type='image/jpeg')
-        
-        # Guardar token en Firestore
-        try:
-            db.collection("imagenes").document(reactivo).set({
-                "token": token,
-                "usuario": st.session_state.user,
-                "timestamp": datetime.datetime.now()
-            })
-            st.success("Imagen subida y token guardado correctamente")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al guardar token en Firestore: {e}")
-
     if st.button("⚠️ Reportar que se está agotando"):
         st.warning("¡Este reactivo ha sido marcado como en riesgo de agotarse!")
         # Aquí podrías guardar el evento en Firestore si lo deseas
-
-elif st.session_state.pantalla == "buscar_reactivo":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Buscar Reactivo")
-    query = st.text_input("Escribe el nombre del reactivo")
-
-    if query:
-        resultados = data[data["Nombre"].str.contains(query, case=False, na=False)].drop_duplicates(subset="Nombre")
-        for reactivo in resultados["Nombre"].sort_values():
-            if st.button(reactivo):
-                st.session_state.reactivo_seleccionado = reactivo
-                st.session_state.pantalla = "detalle_reactivo"
-                st.rerun()
-
-elif st.session_state.pantalla == "ver_alertas":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Reactivos por agotarse")
-    alertas = db.collection("alertas").order_by("timestamp", direction=firestore.Query.DESCENDING).stream()
-
-    registros = []
-    for alerta in alertas:
-        doc = alerta.to_dict()
-        registros.append([
-            doc.get("reactivo", "NA"),
-            doc.get("usuario", "NA"),
-            doc.get("timestamp").strftime("%Y-%m-%d %H:%M") if "timestamp" in doc else "NA"
-        ])
-
-    df_alertas = pd.DataFrame(registros, columns=["Reactivo", "Usuario", "Fecha y hora"])
-    if df_alertas.empty:
-        st.info("No hay alertas registradas.")
-    else:
-        st.dataframe(df_alertas)
-
-# Pantallas en desarrollo
-elif st.session_state.pantalla in ["añadir_reactivo", "buscar_anticuerpo", "ver_anticuerpos", "añadir_anticuerpo"]:
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Función en desarrollo")
-    st.info("Esta funcionalidad está siendo implementada. Pronto estará disponible.")
-
-
