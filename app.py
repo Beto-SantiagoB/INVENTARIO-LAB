@@ -127,7 +127,7 @@ elif st.session_state.pantalla == "detalle_reactivo":
 
     # Intentar mostrar la imagen desde Firebase directamente
     reactivo_encoded = quote(reactivo)
-    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/inventario-lab-c0974/o/reactivos%2F{reactivo_encoded}.jpg?alt=media"
+    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/inventario-lab-c0974.firebasestorage.app/o/reactivos%2F{reactivo_encoded}.jpg?alt=media"
     st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
 
 
