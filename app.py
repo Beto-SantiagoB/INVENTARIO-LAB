@@ -49,6 +49,7 @@ if not st.session_state.authenticated:
 
 # Cargar inventario
 @st.cache_data
+
 def load_data():
     return pd.read_csv("reactivos.csv")
 
@@ -59,7 +60,8 @@ if "pantalla" not in st.session_state:
 if "reactivo_seleccionado" not in st.session_state:
     st.session_state.reactivo_seleccionado = None
 
-if st.session_state.pantalla not in ["buscar_reactivo", "detalle_reactivo", "buscar_anticuerpo"]:
+# Panel principal
+if st.session_state.pantalla is None:
     st.title("Laboratorio de patogénesis molecular")
     st.subheader(f"Bienvenido, {st.session_state.user}")
 
@@ -93,3 +95,16 @@ if st.session_state.pantalla not in ["buscar_reactivo", "detalle_reactivo", "bus
         st.session_state.user = None
         st.session_state.pantalla = None
         st.rerun()
+
+# Botón de volver en submenús
+elif st.session_state.pantalla in [
+    "buscar_reactivo", "ver_reactivos", "detalle_reactivo",
+    "buscar_anticuerpo", "ver_anticuerpos",
+    "añadir_reactivo", "añadir_anticuerpo"
+]:
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
+    # Aquí es donde se desarrollan los contenidos de cada pantalla (no se sobreescriben ahora)
+    st.info(f"Pantalla: {st.session_state.pantalla} (contenido aún por implementar)")
