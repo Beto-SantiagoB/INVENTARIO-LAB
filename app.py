@@ -96,15 +96,53 @@ if st.session_state.pantalla is None:
         st.session_state.pantalla = None
         st.rerun()
 
-# Botón de volver en submenús
-elif st.session_state.pantalla in [
-    "buscar_reactivo", "ver_reactivos", "detalle_reactivo",
-    "buscar_anticuerpo", "ver_anticuerpos",
-    "añadir_reactivo", "añadir_anticuerpo"
-]:
+# Submenús
+elif st.session_state.pantalla == "ver_reactivos":
     if st.button("⬅️ Volver al menú principal"):
         st.session_state.pantalla = None
         st.rerun()
 
-    # Aquí es donde se desarrollan los contenidos de cada pantalla (no se sobreescriben ahora)
+    st.title("Inventario de Reactivos")
+    reactivos = data["Nombre"].dropna().unique()
+    reactivos.sort()
+    for reactivo in reactivos:
+        if st.button(reactivo):
+            st.session_state.reactivo_seleccionado = reactivo
+            st.session_state.pantalla = "detalle_reactivo"
+            st.rerun()
+
+elif st.session_state.pantalla == "detalle_reactivo":
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
+    reactivo = st.session_state.reactivo_seleccionado
+    st.title(reactivo)
+    detalles = data[data["Nombre"] == reactivo]
+
+    imagen_path = detalles["Imagen"].dropna().values[0] if "Imagen" in detalles.columns and not detalles["Imagen"].isna().all() else None
+    if imagen_path:
+        st.image(imagen_path)
+    else:
+        st.info("No hay imagen disponible.")
+
+    etiquetas = detalles["Número"].dropna().tolist()
+    ubicaciones = detalles["Ubicación"].dropna().tolist()
+    empresas = detalles["Empresa"].dropna().tolist()
+    catalogos = detalles["Catálogo"].dropna().tolist()
+    observaciones = detalles["Observaciones"].dropna().tolist()
+
+    st.write("**Número de etiqueta:**", ", ".join(etiquetas))
+    st.write("**Ubicación:**", ", ".join(ubicaciones))
+    st.write("**Empresa:**", ", ".join(empresas))
+    st.write("**Catálogo:**", ", ".join(catalogos))
+    st.write("**Observaciones:**", ", ".join(observaciones))
+
+elif st.session_state.pantalla in [
+    "buscar_reactivo", "buscar_anticuerpo",
+    "ver_anticuerpos", "añadir_reactivo", "añadir_anticuerpo"]:
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
     st.info(f"Pantalla: {st.session_state.pantalla} (contenido aún por implementar)")
