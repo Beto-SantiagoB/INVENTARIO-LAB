@@ -140,7 +140,7 @@ elif st.session_state.pantalla == "detalle_reactivo":
         else:
             st.info("No hay imagen disponible.")
     except Exception as e:
-    st.warning(f"Error al consultar Firestore: {e}")
+        st.warning(f"Error al consultar Firestore: {e}")
 
     def extraer_valores(columna):
         if columna in detalles.columns:
