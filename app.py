@@ -10,21 +10,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore, storage
 from datetime import datetime
 
-
-# Configurar Firebase con pyrebase (solo para autenticación)
-firebase_config = {
-    "apiKey": st.secrets["firebase_api_key"],
-    "authDomain": f"{st.secrets['firebase']['project_id']}.firebaseapp.com",
-    "projectId": st.secrets["firebase"]["project_id"],
-    "storageBucket": st.secrets["firebase"]["project_id"] + ".appspot.com",
-    "messagingSenderId": st.secrets["firebase_messaging_sender_id"],
-    "appId": st.secrets["firebase_app_id"],
-    "databaseURL": ""
-}
-
-firebase = pyrebase.initialize_app(firebase_config)
-auth = firebase.auth()
-
 # Configuración de Firebase Admin SDK
 if not firebase_admin._apps:
     cred = credentials.Certificate(st.secrets["firebase"])
@@ -35,23 +20,30 @@ if not firebase_admin._apps:
 db = firestore.client()
 bucket = storage.bucket()
 
-# Autenticación
+# Autenticación con Firestore (sin pyrebase)
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
     st.session_state.user_email = None
+    st.session_state.user_role = None
 
 def login():
     st.title("Inicio de sesión")
     email = st.text_input("Correo electrónico")
     password = st.text_input("Contraseña", type="password")
     if st.button("Iniciar sesión"):
-        try:
-            user = auth.sign_in_with_email_and_password(email, password)
-            st.session_state.authenticated = True
-            st.session_state.user_email = email
-            st.rerun()
-        except:
-            st.error("Credenciales inválidas o error de conexión")
+        user_ref = db.collection("usuarios").document(email)
+        doc = user_ref.get()
+        if doc.exists:
+            user_data = doc.to_dict()
+            if user_data.get("password") == password:
+                st.session_state.authenticated = True
+                st.session_state.user_email = email
+                st.session_state.user_role = user_data.get("rol", "usuario")
+                st.rerun()
+            else:
+                st.error("Contraseña incorrecta")
+        else:
+            st.error("Usuario no encontrado")
 
 if not st.session_state.authenticated:
     login()
@@ -98,7 +90,7 @@ if st.session_state.pantalla is None:
             st.session_state.pantalla = "añadir_anticuerpo"
             st.rerun()
 
-        if st.session_state.user_email and st.session_state.user_email.endswith("@admin.com"):
+        if st.session_state.user_role == "admin":
             if st.button("⚠️ Reactivos por agotarse"):
                 st.session_state.pantalla = "reactivos_alerta"
                 st.rerun()
@@ -107,6 +99,7 @@ if st.session_state.pantalla is None:
     if st.button("🔓 Cerrar sesión"):
         st.session_state.authenticated = False
         st.session_state.user_email = None
+        st.session_state.user_role = None
         st.session_state.pantalla = None
         st.rerun()
 
