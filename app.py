@@ -9,6 +9,7 @@ from difflib import get_close_matches
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 import json
+from urllib.parse import quote
 
 
 # Configuración de Firebase desde st.secrets
@@ -125,7 +126,8 @@ elif st.session_state.pantalla == "detalle_reactivo":
     detalles = data[data["Nombre"] == reactivo]
 
     # Intentar mostrar la imagen desde Firebase directamente
-    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/inventario-lab-c0974/o/reactivos%2F{reactivo}.jpg?alt=media"
+    reactivo_encoded = quote(reactivo)
+    url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{reactivo_encoded}.jpg?alt=media"
     st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
 
 
