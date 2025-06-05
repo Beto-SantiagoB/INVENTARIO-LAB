@@ -9,11 +9,10 @@ from difflib import get_close_matches
 # import openai  # Comentado temporalmente por falta de crédito
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-import json
 
 # Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
-    cred = credentials.Certificate(json.loads(st.secrets["firebase"]))
+    cred = credentials.Certificate(st.secrets["firebase"])
     firebase_admin.initialize_app(cred, {
         'storageBucket': 'inventario-lab-c0974.appspot.com'
     })
@@ -127,11 +126,14 @@ elif st.session_state.pantalla == "detalle_reactivo":
     else:
         st.info("No hay imagen disponible.")
 
-    etiquetas = detalles["Número"].dropna().tolist()
-    ubicaciones = detalles["Ubicación"].dropna().tolist()
-    empresas = detalles["Empresa"].dropna().tolist()
-    catalogos = detalles["Catálogo"].dropna().tolist()
-    observaciones = detalles["Observaciones"].dropna().tolist()
+    def extraer_valores(columna):
+        return detalles[columna].dropna().tolist() if columna in detalles.columns else []
+
+    etiquetas = extraer_valores("Número")
+    ubicaciones = extraer_valores("Ubicación")
+    empresas = extraer_valores("Empresa")
+    catalogos = extraer_valores("Catálogo")
+    observaciones = extraer_valores("Observaciones")
 
     st.write("**Número de etiqueta:**", ", ".join(etiquetas))
     st.write("**Ubicación:**", ", ".join(ubicaciones))
@@ -139,9 +141,23 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.write("**Catálogo:**", ", ".join(catalogos))
     st.write("**Observaciones:**", ", ".join(observaciones))
 
-elif st.session_state.pantalla in [
-    "buscar_reactivo", "buscar_anticuerpo",
-    "ver_anticuerpos", "añadir_reactivo", "añadir_anticuerpo"]:
+elif st.session_state.pantalla == "buscar_reactivo":
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
+    st.title("Buscar Reactivo")
+    query = st.text_input("Escribe el nombre del reactivo")
+
+    resultados = data[data["Nombre"].str.contains(query, case=False, na=False)].drop_duplicates(subset="Nombre")
+
+    for reactivo in resultados["Nombre"].sort_values():
+        if st.button(reactivo):
+            st.session_state.reactivo_seleccionado = reactivo
+            st.session_state.pantalla = "detalle_reactivo"
+            st.rerun()
+
+elif st.session_state.pantalla in ["buscar_anticuerpo", "ver_anticuerpos", "añadir_reactivo", "añadir_anticuerpo"]:
     if st.button("⬅️ Volver al menú principal"):
         st.session_state.pantalla = None
         st.rerun()
