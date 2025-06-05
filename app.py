@@ -183,32 +183,28 @@ elif st.session_state.pantalla == "buscar_reactivo":
                 st.session_state.pantalla = "detalle_reactivo"
                 st.rerun()
 
-elif st.session_state.pantalla in ["buscar_anticuerpo", "ver_anticuerpos", "añadir_reactivo", "añadir_anticuerpo"]:
+elif st.session_state.pantalla == "ver_alertas":
     if st.button("⬅️ Volver al menú principal"):
         st.session_state.pantalla = None
         st.rerun()
 
-    st.info(f"Pantalla: {st.session_state.pantalla} (contenido aún por implementar)")
-
-elif st.session_state.pantalla == "reactivos_alerta":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Reactivos marcados como en riesgo de agotarse")
-    alertas = db.collection("alertas").stream()
+    st.title("Reactivos por agotarse")
+    alertas = db.collection("alertas").order_by("timestamp", direction=firestore.Query.DESCENDING).stream()
 
     registros = []
     for alerta in alertas:
-        info = alerta.to_dict()
-        registros.append(info)
+        doc = alerta.to_dict()
+        registros.append([
+            doc.get("reactivo", "NA"),
+            doc.get("usuario", "NA"),
+            doc.get("timestamp").strftime("%Y-%m-%d %H:%M") if "timestamp" in doc else "NA"
+        ])
 
-    if registros:
-        df_alertas = pd.DataFrame(registros)
-        df_alertas["timestamp"] = pd.to_datetime(df_alertas["timestamp"])
-        df_alertas = df_alertas.sort_values("timestamp", ascending=False)
-        st.dataframe(df_alertas)
-    else:
+    df_alertas = pd.DataFrame(registros, columns=["Reactivo", "Usuario", "Fecha y hora"])
+    if df_alertas.empty:
         st.info("No hay alertas registradas.")
+    else:
+        st.dataframe(df_alertas)
+
 
 
