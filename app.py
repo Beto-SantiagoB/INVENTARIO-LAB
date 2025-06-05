@@ -205,5 +205,13 @@ elif st.session_state.pantalla == "ver_alertas":
     else:
         st.dataframe(df_alertas)
 
+# Pantallas en desarrollo
+elif st.session_state.pantalla in ["añadir_reactivo", "buscar_anticuerpo", "ver_anticuerpos", "añadir_anticuerpo"]:
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
+    st.title("Función en desarrollo")
+    st.info("Esta funcionalidad está siendo implementada. Pronto estará disponible.")
 
 
