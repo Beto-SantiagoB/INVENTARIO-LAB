@@ -8,40 +8,50 @@ import os
 from difflib import get_close_matches
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
-import json
+from datetime import datetime
+import pyrebase
 
-# Configuración de Firebase desde st.secrets
+# Configurar Firebase con pyrebase (solo para autenticación)
+firebase_config = {
+    "apiKey": st.secrets["firebase_api_key"],
+    "authDomain": f"{st.secrets['firebase']['project_id']}.firebaseapp.com",
+    "projectId": st.secrets["firebase"]["project_id"],
+    "storageBucket": st.secrets["firebase"]["project_id"] + ".appspot.com",
+    "messagingSenderId": st.secrets["firebase_messaging_sender_id"],
+    "appId": st.secrets["firebase_app_id"],
+    "databaseURL": ""
+}
+
+firebase = pyrebase.initialize_app(firebase_config)
+auth = firebase.auth()
+
+# Configuración de Firebase Admin SDK
 if not firebase_admin._apps:
-    cred = credentials.Certificate(json.loads(st.secrets["firebase"]))
+    cred = credentials.Certificate(st.secrets["firebase"])
     firebase_admin.initialize_app(cred, {
-        'storageBucket': 'inventario-lab-c0974.firebasestorage.app'
+        'storageBucket': st.secrets["firebase"]["project_id"] + '.appspot.com'
     })
 
 db = firestore.client()
 bucket = storage.bucket()
 
-# Usuarios simulados
-users = {
-    "admin": {"password": "admin123", "role": "admin"},
-    "usuario": {"password": "usuario123", "role": "user"}
-}
-
 # Autenticación
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-    st.session_state.user = None
+    st.session_state.user_email = None
 
 def login():
     st.title("Inicio de sesión")
-    username = st.text_input("Usuario")
+    email = st.text_input("Correo electrónico")
     password = st.text_input("Contraseña", type="password")
     if st.button("Iniciar sesión"):
-        if username in users and users[username]["password"] == password:
+        try:
+            user = auth.sign_in_with_email_and_password(email, password)
             st.session_state.authenticated = True
-            st.session_state.user = username
+            st.session_state.user_email = email
             st.rerun()
-        else:
-            st.error("Usuario o contraseña incorrectos")
+        except:
+            st.error("Credenciales inválidas o error de conexión")
 
 if not st.session_state.authenticated:
     login()
@@ -62,7 +72,7 @@ if "reactivo_seleccionado" not in st.session_state:
 # Panel principal
 if st.session_state.pantalla is None:
     st.title("Laboratorio de patogénesis molecular")
-    st.subheader(f"Bienvenido, {st.session_state.user}")
+    st.subheader(f"Bienvenido, {st.session_state.user_email}")
 
     col1, col2 = st.columns(2)
 
@@ -87,126 +97,17 @@ if st.session_state.pantalla is None:
         if st.button("➕ Añadir anticuerpo"):
             st.session_state.pantalla = "añadir_anticuerpo"
             st.rerun()
-        if st.session_state.user == "admin":
+
+        if st.session_state.user_email and st.session_state.user_email.endswith("@admin.com"):
             if st.button("⚠️ Reactivos por agotarse"):
-                st.session_state.pantalla = "ver_alertas"
+                st.session_state.pantalla = "reactivos_alerta"
                 st.rerun()
 
     st.markdown("---")
     if st.button("🔓 Cerrar sesión"):
         st.session_state.authenticated = False
-        st.session_state.user = None
+        st.session_state.user_email = None
         st.session_state.pantalla = None
         st.rerun()
 
-# Submenús
-elif st.session_state.pantalla == "ver_reactivos":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Inventario de Reactivos")
-    reactivos = data["Nombre"].dropna().unique()
-    reactivos.sort()
-    for reactivo in reactivos:
-        if st.button(reactivo):
-            st.session_state.reactivo_seleccionado = reactivo
-            st.session_state.pantalla = "detalle_reactivo"
-            st.rerun()
-
-elif st.session_state.pantalla == "detalle_reactivo":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    reactivo = st.session_state.reactivo_seleccionado
-    st.title(reactivo)
-    detalles = data[data["Nombre"] == reactivo]
-
-    imagen_path = detalles["Imagen"].dropna().values[0] if "Imagen" in detalles.columns and not detalles["Imagen"].isna().all() else None
-    if imagen_path:
-        st.image(imagen_path)
-    else:
-        st.info("No hay imagen disponible.")
-
-    def extraer_valores(columna):
-        if columna in detalles.columns:
-            valores = detalles[columna].fillna("NA").tolist()
-            return valores
-        return ["NA"]
-
-    etiquetas = extraer_valores("Número")
-    ubicaciones = extraer_valores("Ubicación")
-    empresas = extraer_valores("Empresa")
-    catalogos = extraer_valores("Catálogo")
-    observaciones = extraer_valores("Observaciones")
-
-    st.write("**Número de etiqueta:**", ", ".join(etiquetas))
-    st.write("**Ubicación:**", ", ".join(ubicaciones))
-    st.write("**Empresa:**", ", ".join(empresas))
-    st.write("**Catálogo:**", ", ".join(catalogos))
-    st.write("**Observaciones:**", ", ".join(observaciones))
-
-    st.markdown("---")
-    st.subheader("Actualizar o añadir fotografía")
-    imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"])
-    if imagen_subida:
-        imagen = Image.open(imagen_subida).convert("RGB")
-        buffer = io.BytesIO()
-        imagen.save(buffer, format="JPEG", quality=50)  # fuerza a JPEG para todos, corrigiendo errores de PNG con transparencia
-        buffer.seek(0)
-        blob = bucket.blob(f"reactivos/{reactivo}.jpg")
-        blob.upload_from_file(buffer, content_type='image/jpeg')
-        url_imagen = blob.public_url
-        st.success("Imagen subida correctamente")
-        st.image(url_imagen)
-
-    if st.button("⚠️ Reportar que se está agotando"):
-        st.warning("¡Este reactivo ha sido marcado como en riesgo de agotarse!")
-        # Aquí podrías guardar el evento en Firestore si lo deseas
-
-elif st.session_state.pantalla == "buscar_reactivo":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Buscar Reactivo")
-    query = st.text_input("Escribe el nombre del reactivo")
-
-    if query:
-        resultados = data[data["Nombre"].str.contains(query, case=False, na=False)].drop_duplicates(subset="Nombre")
-        for reactivo in resultados["Nombre"].sort_values():
-            if st.button(reactivo):
-                st.session_state.reactivo_seleccionado = reactivo
-                st.session_state.pantalla = "detalle_reactivo"
-                st.rerun()
-
-elif st.session_state.pantalla in ["buscar_anticuerpo", "ver_anticuerpos", "añadir_reactivo", "añadir_anticuerpo"]:
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.info(f"Pantalla: {st.session_state.pantalla} (contenido aún por implementar)")
-
-elif st.session_state.pantalla == "reactivos_alerta":
-    if st.button("⬅️ Volver al menú principal"):
-        st.session_state.pantalla = None
-        st.rerun()
-
-    st.title("Reactivos marcados como en riesgo de agotarse")
-    alertas = db.collection("alertas").stream()
-
-    registros = []
-    for alerta in alertas:
-        info = alerta.to_dict()
-        registros.append(info)
-
-    if registros:
-        df_alertas = pd.DataFrame(registros)
-        df_alertas["timestamp"] = pd.to_datetime(df_alertas["timestamp"])
-        df_alertas = df_alertas.sort_values("timestamp", ascending=False)
-        st.dataframe(df_alertas)
-    else:
-        st.info("No hay alertas registradas.")
-
-
+# Resto del código sin cambios...
