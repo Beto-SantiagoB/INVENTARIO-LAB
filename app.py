@@ -6,7 +6,7 @@ from PIL import Image
 import io
 import os
 from difflib import get_close_matches
-import openai
+# import openai  # Comentado temporalmente por falta de crédito
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
