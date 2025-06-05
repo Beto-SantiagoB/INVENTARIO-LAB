@@ -87,6 +87,10 @@ if st.session_state.pantalla is None:
         if st.button("➕ Añadir anticuerpo"):
             st.session_state.pantalla = "añadir_anticuerpo"
             st.rerun()
+        if st.session_state.user == "admin":
+            if st.button("⚠️ Reactivos por agotarse"):
+                st.session_state.pantalla = "ver_alertas"
+                st.rerun()
 
     st.markdown("---")
     if st.button("🔓 Cerrar sesión"):
@@ -126,7 +130,10 @@ elif st.session_state.pantalla == "detalle_reactivo":
         st.info("No hay imagen disponible.")
 
     def extraer_valores(columna):
-        return detalles[columna].dropna().tolist() if columna in detalles.columns else []
+        if columna in detalles.columns:
+            valores = detalles[columna].fillna("NA").tolist()
+            return valores
+        return ["NA"]
 
     etiquetas = extraer_valores("Número")
     ubicaciones = extraer_valores("Ubicación")
@@ -144,9 +151,9 @@ elif st.session_state.pantalla == "detalle_reactivo":
     st.subheader("Actualizar o añadir fotografía")
     imagen_subida = st.file_uploader("Selecciona una imagen", type=["jpg", "jpeg", "png"])
     if imagen_subida:
-        imagen = Image.open(imagen_subida)
+        imagen = Image.open(imagen_subida).convert("RGB")
         buffer = io.BytesIO()
-        imagen.save(buffer, format="JPEG", quality=50)
+        imagen.save(buffer, format="JPEG", quality=50)  # fuerza a JPEG para todos, corrigiendo errores de PNG con transparencia
         buffer.seek(0)
         blob = bucket.blob(f"reactivos/{reactivo}.jpg")
         blob.upload_from_file(buffer, content_type='image/jpeg')
@@ -180,3 +187,27 @@ elif st.session_state.pantalla in ["buscar_anticuerpo", "ver_anticuerpos", "aña
         st.rerun()
 
     st.info(f"Pantalla: {st.session_state.pantalla} (contenido aún por implementar)")
+
+elif st.session_state.pantalla == "ver_alertas":
+    if st.button("⬅️ Volver al menú principal"):
+        st.session_state.pantalla = None
+        st.rerun()
+
+    st.title("Reactivos por agotarse")
+    alertas = db.collection("alertas").order_by("timestamp", direction=firestore.Query.DESCENDING).stream()
+
+    registros = []
+    for alerta in alertas:
+        doc = alerta.to_dict()
+        registros.append([
+            doc.get("reactivo", "NA"),
+            doc.get("usuario", "NA"),
+            doc.get("timestamp").strftime("%Y-%m-%d %H:%M") if "timestamp" in doc else "NA"
+        ])
+
+    df_alertas = pd.DataFrame(registros, columns=["Reactivo", "Usuario", "Fecha y hora"])
+    if df_alertas.empty:
+        st.info("No hay alertas registradas.")
+    else:
+        st.dataframe(df_alertas)
+
