@@ -10,7 +10,7 @@ from difflib import get_close_matches
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
-# Configuración de Firebase
+# Configuración de Firebase desde st.secrets
 if not firebase_admin._apps:
     cred = credentials.Certificate("firebase_key.json")
     firebase_admin.initialize_app(cred, {

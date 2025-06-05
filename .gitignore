@@ -1,0 +1,3 @@
+# Ignorar credenciales sensibles
+firebase_key.json
+.streamlit/secrets.toml
