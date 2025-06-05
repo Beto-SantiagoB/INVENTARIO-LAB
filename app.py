@@ -128,17 +128,19 @@ elif st.session_state.pantalla == "detalle_reactivo":
     detalles = data[data["Nombre"] == reactivo]
 
     doc_ref = db.collection("imagenes").document(reactivo)
-    doc = doc_ref.get()
-    if doc.exists:
-        token = doc.to_dict().get("token")
-        if token:
-            url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{quote(reactivo)}.jpg?alt=media&token={token}"
-            st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
+    try:
+        doc = doc_ref.get()
+        if doc.exists:
+            token = doc.to_dict().get("token")
+            if token:
+                url_imagen = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/reactivos%2F{quote(reactivo)}.jpg?alt=media&token={token}"
+                st.image(url_imagen, caption="Imagen del reactivo", use_container_width=True)
+            else:
+                st.info("No hay imagen disponible.")
         else:
             st.info("No hay imagen disponible.")
-    else:
-        st.info("No hay imagen disponible.")
-
+    except Exception as e:
+    st.warning(f"Error al consultar Firestore: {e}")
 
     def extraer_valores(columna):
         if columna in detalles.columns:
