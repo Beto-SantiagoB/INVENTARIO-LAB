@@ -2,3 +2,4 @@ streamlit
 pandas
 Pillow
 requests
+firebase_admin
